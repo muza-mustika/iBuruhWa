@@ -25,6 +25,7 @@ const AUTH_DIR = path.resolve(workspaceRoot, "artifacts/api-server/wa-auth");
 export const SERVER_ID = process.env.SERVER_ID ?? `srv_${randomUUID().slice(0, 8)}`;
 
 const LOCK_TTL_MS = 30_000;
+// Sesi grup balasan kadaluarsa setelah 6 jam tidak ada aktivitas
 const GROUP_REPLY_TTL_MS = 6 * 60 * 60 * 1000;
 
 interface SessionState {
@@ -98,30 +99,28 @@ class WAManager {
       .catch((err) => logger.error({ err }, "Gagal tandai pesan diproses"));
   }
 
-  /**
-   * Update lastUsedAt sesi — dipanggil setiap ada aktivitas nyata
-   * (terima/kirim pesan, koneksi terbuka).
-   */
-  private async touchSessionActivity(sessionId: string): Promise<void> {
+  private emitSessionUpdate(sessionId: string) {
     if (!isDbReady()) return;
-    await getDb()
+    getDb().select().from(sessionsTable).where(eq(sessionsTable.id, sessionId))
+      .then(([s]) => s && eventBus.emit("session", { ...s, createdAt: s.createdAt.toISOString() }))
+      .catch(() => {});
+  }
+
+  /**
+   * Update lastUsedAt pada sesi — dipanggil setiap ada aktivitas kirim/terima pesan.
+   */
+  private touchSessionActivity(sessionId: string): void {
+    if (!isDbReady()) return;
+    getDb()
       .update(sessionsTable)
       .set({ lastUsedAt: new Date() })
       .where(eq(sessionsTable.id, sessionId))
       .catch(() => {});
   }
 
-  private emitSessionUpdate(sessionId: string) {
-    if (!isDbReady()) return;
-    getDb().select().from(sessionsTable).where(eq(sessionsTable.id, sessionId))
-      .then(([s]) => s && eventBus.emit("session", {
-        ...s,
-        createdAt: s.createdAt.toISOString(),
-        lastUsedAt: s.lastUsedAt?.toISOString() ?? null,
-      }))
-      .catch(() => {});
-  }
-
+  /**
+   * Cari atau buat sesi grup balasan.
+   */
   private async getGroupReplySession(chatJid: string, ruleGroupId: number) {
     if (!isDbReady()) return null;
     const now = new Date();
@@ -202,7 +201,6 @@ class WAManager {
           const sess = this.sessions.get(sessionId);
           if (sess) sess.qr = base64;
         } catch (err) { logger.error({ err, sessionId }, "Gagal buat QR"); }
-
         if (isDbReady()) {
           await getDb().update(sessionsTable).set({ status: "connecting" }).where(eq(sessionsTable.id, sessionId)).catch(() => {});
           this.emitSessionUpdate(sessionId);
@@ -214,7 +212,7 @@ class WAManager {
         const sess = this.sessions.get(sessionId);
         if (sess) sess.qr = null;
 
-        const boomErr = lastDisconnect?.error as Boom | undefined;
+        const boomErr = (lastDisconnect?.error) as Boom | undefined;
         const statusCode = boomErr?.output?.statusCode;
         const shouldReconnect = statusCode !== DisconnectReason.loggedOut && statusCode !== 401;
 
@@ -240,11 +238,9 @@ class WAManager {
 
         const phone = sock.user?.id?.split(":")[0] ?? null;
         if (isDbReady()) {
-          await getDb().update(sessionsTable).set({
-            status: "connected",
-            phoneNumber: phone,
-            lastUsedAt: new Date(),
-          }).where(eq(sessionsTable.id, sessionId)).catch(() => {});
+          await getDb().update(sessionsTable)
+            .set({ status: "connected", phoneNumber: phone, lastUsedAt: new Date() })
+            .where(eq(sessionsTable.id, sessionId)).catch(() => {});
           this.emitSessionUpdate(sessionId);
         }
         logger.info({ sessionId, phone, serverId: SERVER_ID }, "Sesi terhubung");
@@ -275,13 +271,11 @@ class WAManager {
         const messageId = inserted[0].id;
 
         // Update counter dan lastUsedAt saat menerima pesan
-        await getDb().execute(sql`UPDATE sessions SET messages_received = messages_received + 1, last_used_at = NOW() WHERE id = ${sessionId}`).catch(() => {});
+        await getDb().execute(
+          sql`UPDATE sessions SET messages_received = messages_received + 1, last_used_at = NOW() WHERE id = ${sessionId}`
+        ).catch(() => {});
 
-        const msgRow = {
-          id: messageId, sessionId, from, pushName, text,
-          isProcessed: false, timestamp: new Date().toISOString(),
-          repliedBySession: null, repliedAt: null, actionTaken: null, matchedRuleId: null,
-        };
+        const msgRow = { id: messageId, sessionId, from, pushName, text, isProcessed: false, timestamp: new Date().toISOString(), repliedBySession: null, repliedAt: null, actionTaken: null, matchedRuleId: null };
         eventBus.emit("message", msgRow);
 
         await this.processStoredMessage(messageId, sessionId, from, pushName, text, sock);
@@ -316,6 +310,7 @@ class WAManager {
 
     if (matchedRule) {
       if (matchedRule.actionType === "reply" && matchedRule.replyText) {
+        // Mode Pesan Berkelompok: aturan dengan groupId akan mengedit pesan bot sebelumnya
         if (matchedRule.groupId != null) {
           actionTaken = await this.handleGroupReplyEdit(
             sessionId, from, matchedRule.groupId, matchedRule.replyText, sock
@@ -327,8 +322,10 @@ class WAManager {
             if (delay > 0) await new Promise((r) => setTimeout(r, delay));
             await sock.sendPresenceUpdate("paused", from);
             await sock.sendMessage(from, { text: matchedRule.replyText });
-            // Update sent counter + lastUsedAt
-            await getDb().execute(sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`).catch(() => {});
+            // Update counter dan lastUsedAt saat kirim pesan
+            await getDb().execute(
+              sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`
+            ).catch(() => {});
             actionTaken = "reply";
           } catch (err) { logger.error({ err, sessionId, messageId }, "Gagal kirim balasan"); actionTaken = "reply_failed"; }
         }
@@ -349,7 +346,7 @@ class WAManager {
             };
             if (method === "GET") await axios.get(matchedRule.webhookUrl, { params: payload });
             else await axios.post(matchedRule.webhookUrl, payload);
-            await this.touchSessionActivity(sessionId);
+            this.touchSessionActivity(sessionId);
             actionTaken = "webhook";
           } catch (err) { logger.error({ err, sessionId }, "Webhook gagal"); actionTaken = "webhook_failed"; }
         }
@@ -361,7 +358,7 @@ class WAManager {
           if (delay > 0) await new Promise((r) => setTimeout(r, delay));
           await sock.sendPresenceUpdate("paused", matchedRule.forwardTo);
           await sock.sendMessage(matchedRule.forwardTo, { text: fwdText });
-          await this.touchSessionActivity(sessionId);
+          this.touchSessionActivity(sessionId);
           actionTaken = "forward";
         } catch (err) { logger.error({ err, sessionId }, "Forward gagal"); }
       }
@@ -369,14 +366,15 @@ class WAManager {
 
     await this.markMessageProcessed(messageId, sessionId, actionTaken, matchedRule?.id ?? null);
 
-    eventBus.emit("message", {
-      id: messageId, sessionId, from, pushName, text,
-      isProcessed: true, actionTaken,
-      repliedBySession: sessionId, repliedAt: new Date().toISOString(),
-      timestamp: new Date().toISOString(),
-    });
+    eventBus.emit("message", { id: messageId, sessionId, from, pushName, text, isProcessed: true, actionTaken, repliedBySession: sessionId, repliedAt: new Date().toISOString(), timestamp: new Date().toISOString() });
   }
 
+  /**
+   * Tangani logika Pesan Berkelompok:
+   * - Cek apakah sudah ada sesi aktif untuk chat + kelompok ini
+   * - Jika belum → kirim pesan baru, simpan sesi
+   * - Jika sudah → edit pesan bot sebelumnya
+   */
   private async handleGroupReplyEdit(
     sessionId: string,
     chatJid: string,
@@ -398,7 +396,9 @@ class WAManager {
           await this.upsertGroupReplySession(chatJid, ruleGroupId, sessionId, sent.key.id, sent.key as object, replyText);
           logger.info({ chatJid, ruleGroupId, msgId: sent.key.id }, "Kelompok: pesan baru dikirim");
         }
-        await getDb().execute(sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`).catch(() => {});
+        await getDb().execute(
+          sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`
+        ).catch(() => {});
         return "group_reply_new";
       } else {
         const botKey = existingSession.botMessageKey as proto.IMessageKey;
@@ -412,8 +412,10 @@ class WAManager {
           } as any);
 
           await this.incrementGroupReplySession(existingSession.id, updatedContent);
-          await getDb().execute(sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`).catch(() => {});
           logger.info({ chatJid, ruleGroupId, replyCount, msgId: existingSession.botMessageId }, "Kelompok: pesan diedit");
+          await getDb().execute(
+            sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`
+          ).catch(() => {});
           return "group_reply_edit";
         } catch (editErr) {
           logger.warn({ editErr, chatJid, ruleGroupId }, "Edit pesan kelompok gagal, kirim pesan baru & reset sesi");
@@ -423,7 +425,9 @@ class WAManager {
           if (sent?.key?.id) {
             await this.upsertGroupReplySession(chatJid, ruleGroupId, sessionId, sent.key.id, sent.key as object, replyText);
           }
-          await getDb().execute(sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`).catch(() => {});
+          await getDb().execute(
+            sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`
+          ).catch(() => {});
           return "group_reply_reset";
         }
       }
@@ -477,11 +481,8 @@ class WAManager {
       if (!connected.length) return { success: false, sessionId: "", messageId: null, error: "Tidak ada sesi aktif" };
 
       if (isDbReady()) {
-        const sessionStats = await getDb()
-          .select({ id: sessionsTable.id, sent: sessionsTable.messagesSent })
-          .from(sessionsTable)
-          .where(eq(sessionsTable.status, "connected"))
-          .catch(() => [] as { id: string; sent: number }[]);
+        const sessionStats = await getDb().select({ id: sessionsTable.id, sent: sessionsTable.messagesSent })
+          .from(sessionsTable).where(eq(sessionsTable.status, "connected")).catch(() => [] as { id: string; sent: number }[]);
         const connectedIds = new Set(connected.map(([id]) => id));
         const eligible = sessionStats.filter((s) => connectedIds.has(s.id));
         if (eligible.length > 0) {
@@ -502,8 +503,10 @@ class WAManager {
       const jid = to.includes("@") ? to : `${to.replace(/\D/g, "")}@s.whatsapp.net`;
       const result = await sess.socket.sendMessage(jid, { text });
       if (isDbReady()) {
-        // Update sent counter + lastUsedAt
-        await getDb().execute(sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${targetId}`).catch(() => {});
+        // Update counter dan lastUsedAt saat sendMessage dipanggil langsung
+        await getDb().execute(
+          sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${targetId}`
+        ).catch(() => {});
       }
       return { success: true, sessionId: targetId!, messageId: result?.key?.id ?? null, error: null };
     } catch (err: any) {
@@ -517,7 +520,7 @@ class WAManager {
     const sessions = await getDb().select().from(sessionsTable);
     for (const sess of sessions) {
       if (sess.status !== "banned") {
-        logger.info({ sessionId: sess.id, serverId: SERVER_ID }, "Melanjutkan sesi dari database");
+        logger.info({ sessionId: sess.id, serverId: SERVER_ID }, "Melanjutkan sesi");
         await getDb().update(sessionsTable).set({ status: "connecting" }).where(eq(sessionsTable.id, sess.id)).catch(() => {});
         this.startSession(sess.id).catch((err) => logger.error({ err, sessionId: sess.id }, "Gagal melanjutkan sesi"));
       }
