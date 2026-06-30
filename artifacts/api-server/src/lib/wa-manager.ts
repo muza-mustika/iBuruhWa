@@ -31,6 +31,8 @@ const GROUP_REPLY_TTL_MS = 6 * 60 * 60 * 1000;
 interface SessionState {
   socket: WASocket | null;
   qr: string | null;
+  /** true hanya saat connection.update = "open", false saat "close" atau saat reconnect */
+  connected: boolean;
 }
 
 class WAManager {
@@ -133,9 +135,9 @@ class WAManager {
         .catch(() => [] as any[]);
 
       if (existing) {
-        // Validasi: sesi yang di-assign masih terhubung?
-        const assignedSock = this.sessions.get(existing.sessionId);
-        if (assignedSock?.socket) {
+        // Validasi: sesi yang di-assign BETUL-BETUL terhubung (connected = true, bukan sekadar socket ada)
+        const assignedState = this.sessions.get(existing.sessionId);
+        if (assignedState?.connected) {
           // Update last_message_at dan counter
           await getDb()
             .update(chatSessionAssignmentsTable)
@@ -147,12 +149,13 @@ class WAManager {
             .catch(() => {});
           return existing.sessionId;
         }
-        // Sesi yang di-assign sudah tidak aktif → reassign
+        // Sesi yang di-assign putus/mati → lanjut ke reassign otomatis
+        logger.info({ chatJid, deadSession: existing.sessionId }, "Load balance: sesi mati, mencari pengganti");
       }
 
-      // Pilih sesi aktif dengan beban paling sedikit (jumlah chat yang di-assign)
+      // Hanya sesi yang benar-benar connected (flag = true) yang bisa dipilih
       const connectedSessions = [...this.sessions.entries()]
-        .filter(([, s]) => s.socket !== null)
+        .filter(([, s]) => s.connected)
         .map(([id]) => id);
 
       if (!connectedSessions.length) return fallbackSessionId;
@@ -282,7 +285,7 @@ class WAManager {
       getMessage: async () => ({ conversation: "" }),
     });
 
-    this.sessions.set(sessionId, { socket: sock, qr: null });
+    this.sessions.set(sessionId, { socket: sock, qr: null, connected: false });
 
     sock.ev.on("creds.update", saveCreds);
 
@@ -305,7 +308,7 @@ class WAManager {
 
       if (connection === "close") {
         const sess = this.sessions.get(sessionId);
-        if (sess) sess.qr = null;
+        if (sess) { sess.qr = null; sess.connected = false; }
 
         const boomErr = (lastDisconnect?.error) as Boom | undefined;
         const statusCode = boomErr?.output?.statusCode;
@@ -329,7 +332,7 @@ class WAManager {
         }
       } else if (connection === "open") {
         const sess = this.sessions.get(sessionId);
-        if (sess) sess.qr = null;
+        if (sess) { sess.qr = null; sess.connected = true; }
 
         const phone = sock.user?.id?.split(":")[0] ?? null;
         if (isDbReady()) {
@@ -581,7 +584,8 @@ class WAManager {
     let targetId = sessionId;
 
     if (!targetId) {
-      const connected = [...this.sessions.entries()].filter(([, s]) => s.socket !== null);
+      // Hanya sesi dengan connected = true yang bisa dipakai
+      const connected = [...this.sessions.entries()].filter(([, s]) => s.connected);
       if (!connected.length) return { success: false, sessionId: "", messageId: null, error: "Tidak ada sesi aktif" };
 
       if (isDbReady()) {
@@ -601,7 +605,7 @@ class WAManager {
     }
 
     const sess = this.sessions.get(targetId!);
-    if (!sess?.socket) return { success: false, sessionId: targetId!, messageId: null, error: "Sesi tidak terhubung" };
+    if (!sess?.connected || !sess?.socket) return { success: false, sessionId: targetId!, messageId: null, error: "Sesi tidak terhubung" };
 
     try {
       const jid = to.includes("@") ? to : `${to.replace(/\D/g, "")}@s.whatsapp.net`;
