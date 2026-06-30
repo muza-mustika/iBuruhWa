@@ -1,0 +1,312 @@
+++++++++++
+Progress: resolved 600, reused 573, downloaded 2, added 10, done
+. preinstall$ sh -c 'rm -f package-lock.json yarn.loc…
+└─ Done in 39ms
+Done in 6s using pnpm v11.9.0
+========================================
+  iBuruhWa — Menjalankan Server
+========================================
+
+▶ API Server    → http://localhost:8080
+▶ Web Dashboard → http://localhost:19904
+
+Tekan Ctrl+C untuk menghentikan semua proses.
+
+$ vite --config vite.config.ts --host 0.0.0.0
+$ export NODE_ENV=development && pnpm run build && pnpm run start
+
+  VITE v7.3.5  ready in 377 ms
+
+  ➜  Local:   http://localhost:19904/
+  ➜  Network: http://10.0.56.40:19904/
+(!) Failed to run dependency scan. Skipping dependency pre-bundling. Error:   Failed to scan for dependencies from entries:
+  /home/muzz/Documents/App/tes1/iBuruhWa/artifacts/wa-dashboard/index.html
+
+  ✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useBroadcastMessage"
+
+    src/pages/broadcast.tsx:2:9:
+      2 │ import { useBroadcastMessage, useListSessions, getListSessionsQuery...
+        ╵          ~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListSessions"
+
+    src/pages/broadcast.tsx:2:30:
+      2 │ ...t { useBroadcastMessage, useListSessions, getListSessionsQueryKe...
+        ╵                             ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListSessionsQueryKey"
+
+    src/pages/broadcast.tsx:2:47:
+      2 │ ...ge, useListSessions, getListSessionsQueryKey } from "@workspace/...
+        ╵                         ~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useGetStats"
+
+    src/pages/dashboard.tsx:1:9:
+      1 │ import { useGetStats, getGetStatsQueryKey, useGetStatsChart, getGet...
+        ╵          ~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getGetStatsQueryKey"
+
+    src/pages/dashboard.tsx:1:22:
+      1 │ import { useGetStats, getGetStatsQueryKey, useGetStatsChart, getGet...
+        ╵                       ~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useGetStatsChart"
+
+    src/pages/dashboard.tsx:1:43:
+      1 │ ...s, getGetStatsQueryKey, useGetStatsChart, getGetStatsChartQueryK...
+        ╵                            ~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getGetStatsChartQueryKey"
+
+    src/pages/dashboard.tsx:1:61:
+      1 │ ..., useGetStatsChart, getGetStatsChartQueryKey, useListSessions, g...
+        ╵                        ~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListSessions"
+
+    src/pages/dashboard.tsx:1:87:
+      1 │ ...etGetStatsChartQueryKey, useListSessions, getListSessionsQueryKe...
+        ╵                             ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListSessionsQueryKey"
+
+    src/pages/dashboard.tsx:1:104:
+      1 │ ...ey, useListSessions, getListSessionsQueryKey } from "@workspace/...
+        ╵                         ~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListMessages"
+
+    src/pages/messages.tsx:3:9:
+      3 │ import { useListMessages, getListMessagesQueryKey, useListSessions,...
+        ╵          ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListMessagesQueryKey"
+
+    src/pages/messages.tsx:3:26:
+      3 │ ...t { useListMessages, getListMessagesQueryKey, useListSessions, g...
+        ╵                         ~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListSessions"
+
+    src/pages/messages.tsx:3:51:
+      3 │ ...getListMessagesQueryKey, useListSessions, getListSessionsQueryKe...
+        ╵                             ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListSessionsQueryKey"
+
+    src/pages/messages.tsx:3:68:
+      3 │ ...ey, useListSessions, getListSessionsQueryKey } from "@workspace/...
+        ╵                         ~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListRules"
+
+    src/pages/rules.tsx:3:2:
+      3 │   useListRules, useCreateRule, useUpdateRule, useDeleteRule,
+        ╵   ~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useCreateRule"
+
+    src/pages/rules.tsx:3:16:
+      3 │   useListRules, useCreateRule, useUpdateRule, useDeleteRule,
+        ╵                 ~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useUpdateRule"
+
+    src/pages/rules.tsx:3:31:
+      3 │   useListRules, useCreateRule, useUpdateRule, useDeleteRule,
+        ╵                                ~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useDeleteRule"
+
+    src/pages/rules.tsx:3:46:
+      3 │   useListRules, useCreateRule, useUpdateRule, useDeleteRule,
+        ╵                                               ~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListGroupReplySessions"
+
+    src/pages/rules.tsx:4:2:
+      4 │   useListGroupReplySessions, useDeleteGroupReplySession,
+        ╵   ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useDeleteGroupReplySession"
+
+    src/pages/rules.tsx:4:29:
+      4 │   useListGroupReplySessions, useDeleteGroupReplySession,
+        ╵                              ~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListRuleGroups"
+
+    src/pages/rules.tsx:5:2:
+      5 │   useListRuleGroups, useCreateRuleGroup, useUpdateRuleGroup, useDel...
+        ╵   ~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useCreateRuleGroup"
+
+    src/pages/rules.tsx:5:21:
+      5 │   useListRuleGroups, useCreateRuleGroup, useUpdateRuleGroup, useDel...
+        ╵                      ~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useUpdateRuleGroup"
+
+    src/pages/rules.tsx:5:41:
+      5 │ ...Groups, useCreateRuleGroup, useUpdateRuleGroup, useDeleteRuleGroup,
+        ╵                                ~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useDeleteRuleGroup"
+
+    src/pages/rules.tsx:5:61:
+      5 │ ...Groups, useCreateRuleGroup, useUpdateRuleGroup, useDeleteRuleGroup,
+        ╵                                                    ~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListRulesQueryKey"
+
+    src/pages/rules.tsx:6:2:
+      6 │   getListRulesQueryKey, getListGroupReplySessionsQueryKey, getListR...
+        ╵   ~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListGroupReplySessionsQueryKey"
+
+    src/pages/rules.tsx:6:24:
+      6 │ ...tRulesQueryKey, getListGroupReplySessionsQueryKey, getListRuleGr...
+        ╵                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListRuleGroupsQueryKey"
+
+    src/pages/rules.tsx:6:59:
+      6 │ ...yKey, getListGroupReplySessionsQueryKey, getListRuleGroupsQueryKey,
+        ╵                                             ~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useSendMessage"
+
+    src/pages/send.tsx:1:9:
+      1 │ import { useSendMessage, useListSessions, getListSessionsQueryKey }...
+        ╵          ~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListSessions"
+
+    src/pages/send.tsx:1:25:
+      1 │ import { useSendMessage, useListSessions, getListSessionsQueryKey }...
+        ╵                          ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListSessionsQueryKey"
+
+    src/pages/send.tsx:1:42:
+      1 │ ...ge, useListSessions, getListSessionsQueryKey } from "@workspace/...
+        ╵                         ~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useListSessions"
+
+    src/pages/sessions.tsx:2:9:
+      2 │ import { useListSessions, getListSessionsQueryKey, useCreateSession...
+        ╵          ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "getListSessionsQueryKey"
+
+    src/pages/sessions.tsx:2:26:
+      2 │ ...t { useListSessions, getListSessionsQueryKey, useCreateSession, ...
+        ╵                         ~~~~~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useCreateSession"
+
+    src/pages/sessions.tsx:2:51:
+      2 │ ...etListSessionsQueryKey, useCreateSession, useDeleteSession, useG...
+        ╵                            ~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useDeleteSession"
+
+    src/pages/sessions.tsx:2:69:
+      2 │ ...yKey, useCreateSession, useDeleteSession, useGetSessionQr, useRe...
+        ╵                            ~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useGetSessionQr"
+
+    src/pages/sessions.tsx:2:87:
+      2 │ ...ssion, useDeleteSession, useGetSessionQr, useReconnectSession } ...
+        ╵                             ~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useReconnectSession"
+
+    src/pages/sessions.tsx:2:104:
+      2 │ ...sion, useGetSessionQr, useReconnectSession } from "@workspace/ap...
+        ╵                           ~~~~~~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useGetSettings"
+
+    src/pages/settings.tsx:2:9:
+      2 │ import { useGetSettings, useUpdateSettings } from "@workspace/api-c...
+        ╵          ~~~~~~~~~~~~~~
+
+
+✘ [ERROR] No matching export in "../../lib/api-client-react/src/index.ts" for import "useUpdateSettings"
+
+    src/pages/settings.tsx:2:25:
+      2 │ import { useGetSettings, useUpdateSettings } from "@workspace/api-c...
+        ╵                          ~~~~~~~~~~~~~~~~~
+
+
+    at failureErrorWithLog (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1467:15)
+    at /home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:926:25
+    at runOnEndCallbacks (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:1307:45)
+    at buildResponseToResult (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:924:7)
+    at /home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:936:9
+    at new Promise (<anonymous>)
+    at requestCallbacks.on-end (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:935:54)
+    at handleRequest (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:628:17)
+    at handleIncomingPacket (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:653:7)
+    at Socket.readFromStdout (/home/muzz/Documents/App/tes1/iBuruhWa/node_modules/.pnpm/esbuild@0.27.3/node_modules/esbuild/lib/main.js:581:7)
+$ node ./build.mjs
+
+  dist/index.mjs                       9.6mb ⚠️
+  dist/pino-worker.mjs               153.4kb
+  dist/pino-file.mjs                 142.1kb
+  dist/pino-pretty.mjs               114.6kb
+  dist/thread-stream-worker.mjs        7.3kb
+  dist/index.mjs.map                  15.4mb
+  dist/pino-worker.mjs.map           256.9kb
+  dist/pino-file.mjs.map             229.1kb
+  dist/pino-pretty.mjs.map           204.0kb
+  dist/thread-stream-worker.mjs.map   12.0kb
+
+⚡ Done in 517ms
+$ node --enable-source-maps ./dist/index.mjs
+[07:24:43.207] INFO (98753): Server listening
+    port: 8080
+^[[1;2A
+
