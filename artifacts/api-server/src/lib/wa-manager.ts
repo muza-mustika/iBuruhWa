@@ -9,8 +9,8 @@ import path from "path";
 import fs from "fs";
 import { toDataURL } from "qrcode";
 import { getDb, getPool, isDbReady } from "@workspace/db";
-import { sessionsTable, rulesTable, messagesTable, appSettingsTable, groupReplySessionsTable } from "@workspace/db";
-import { eq, asc, and, sql, gt } from "drizzle-orm";
+import { sessionsTable, rulesTable, messagesTable, appSettingsTable, groupReplySessionsTable, chatSessionAssignmentsTable } from "@workspace/db";
+import { eq, asc, and, sql, gt, count } from "drizzle-orm";
 import { logger } from "./logger";
 import { eventBus } from "../routes/events";
 import axios from "axios";
@@ -104,6 +104,101 @@ class WAManager {
     getDb().select().from(sessionsTable).where(eq(sessionsTable.id, sessionId))
       .then(([s]) => s && eventBus.emit("session", { ...s, createdAt: s.createdAt.toISOString() }))
       .catch(() => {});
+  }
+
+  /**
+   * Load Balance: ambil atau buat assignment chat → sesi.
+   * - Cek apakah load balance aktif di settings
+   * - Jika chatJid sudah punya assignment → kembalikan sessionId yang di-assign
+   * - Jika belum → pilih sesi yang paling sedikit chatnya (round-robin berbasis beban)
+   * - Kembalikan null jika load balance nonaktif atau tidak ada sesi terhubung
+   */
+  async getOrAssignLoadBalanceSession(chatJid: string, fallbackSessionId: string): Promise<string> {
+    if (!isDbReady()) return fallbackSessionId;
+    try {
+      // Cek apakah load balance aktif
+      const [setting] = await getDb()
+        .select()
+        .from(appSettingsTable)
+        .where(eq(appSettingsTable.key, "loadBalanceEnabled"))
+        .catch(() => [] as any[]);
+
+      if (setting?.value === "false") return fallbackSessionId;
+
+      // Cek assignment yang sudah ada
+      const [existing] = await getDb()
+        .select()
+        .from(chatSessionAssignmentsTable)
+        .where(eq(chatSessionAssignmentsTable.chatJid, chatJid))
+        .catch(() => [] as any[]);
+
+      if (existing) {
+        // Validasi: sesi yang di-assign masih terhubung?
+        const assignedSock = this.sessions.get(existing.sessionId);
+        if (assignedSock?.socket) {
+          // Update last_message_at dan counter
+          await getDb()
+            .update(chatSessionAssignmentsTable)
+            .set({
+              messageCount: sql`${chatSessionAssignmentsTable.messageCount} + 1`,
+              lastMessageAt: new Date(),
+            })
+            .where(eq(chatSessionAssignmentsTable.chatJid, chatJid))
+            .catch(() => {});
+          return existing.sessionId;
+        }
+        // Sesi yang di-assign sudah tidak aktif → reassign
+      }
+
+      // Pilih sesi aktif dengan beban paling sedikit (jumlah chat yang di-assign)
+      const connectedSessions = [...this.sessions.entries()]
+        .filter(([, s]) => s.socket !== null)
+        .map(([id]) => id);
+
+      if (!connectedSessions.length) return fallbackSessionId;
+
+      // Hitung jumlah chat per sesi aktif
+      const loads = await getDb()
+        .select({
+          sessionId: chatSessionAssignmentsTable.sessionId,
+          chatCount: count(chatSessionAssignmentsTable.chatJid),
+        })
+        .from(chatSessionAssignmentsTable)
+        .groupBy(chatSessionAssignmentsTable.sessionId)
+        .catch(() => [] as any[]);
+
+      const loadMap: Record<string, number> = Object.fromEntries(
+        connectedSessions.map((id) => [id, 0])
+      );
+      for (const l of loads) {
+        if (loadMap[l.sessionId] !== undefined) loadMap[l.sessionId] = Number(l.chatCount);
+      }
+
+      // Pilih sesi dengan beban paling ringan
+      const targetId = connectedSessions.reduce((min, id) =>
+        (loadMap[id] ?? 0) < (loadMap[min] ?? 0) ? id : min, connectedSessions[0]);
+
+      // Simpan atau update assignment
+      await getDb()
+        .insert(chatSessionAssignmentsTable)
+        .values({ chatJid, sessionId: targetId, messageCount: 1, lastMessageAt: new Date() })
+        .onConflictDoUpdate({
+          target: chatSessionAssignmentsTable.chatJid,
+          set: {
+            sessionId: targetId,
+            assignedAt: new Date(),
+            messageCount: sql`${chatSessionAssignmentsTable.messageCount} + 1`,
+            lastMessageAt: new Date(),
+          },
+        })
+        .catch(() => {});
+
+      logger.info({ chatJid, assignedTo: targetId, load: loadMap }, "Load balance: chat di-assign ke sesi");
+      return targetId;
+    } catch (err) {
+      logger.error({ err, chatJid }, "getOrAssignLoadBalanceSession gagal, gunakan fallback");
+      return fallbackSessionId;
+    }
   }
 
   /**
@@ -298,11 +393,17 @@ class WAManager {
       return;
     }
 
+    // Load Balance: tentukan sesi mana yang akan MENGIRIM balasan untuk chat ini
+    // Sesi yang menerima pesan (sessionId) bisa berbeda dengan sesi yang membalas (replySesionId)
+    const replySessionId = await this.getOrAssignLoadBalanceSession(from, sessionId);
+    const replySock = this.sessions.get(replySessionId)?.socket ?? sock;
+
     const rules = await getDb().select().from(rulesTable).where(eq(rulesTable.isActive, true)).orderBy(asc(rulesTable.priority));
 
     let matchedRule: (typeof rules)[0] | null = null;
     for (const rule of rules) {
-      if (rule.sessionFilter && rule.sessionFilter !== sessionId) continue;
+      // sessionFilter tetap dihormati: jika rule punya filter, hanya sesi itu yang boleh proses
+      if (rule.sessionFilter && rule.sessionFilter !== sessionId && rule.sessionFilter !== replySessionId) continue;
       if (this.matchRule(rule, text)) { matchedRule = rule; break; }
     }
 
@@ -313,21 +414,24 @@ class WAManager {
         // Mode Pesan Berkelompok: aturan dengan groupId akan mengedit pesan bot sebelumnya
         if (matchedRule.groupId != null) {
           actionTaken = await this.handleGroupReplyEdit(
-            sessionId, from, matchedRule.groupId, matchedRule.replyText, sock
+            replySessionId, from, matchedRule.groupId, matchedRule.replyText, replySock
           );
         } else {
           try {
-            await sock.sendPresenceUpdate("composing", from);
+            await replySock.sendPresenceUpdate("composing", from);
             const delay = await this.getTypingDelay(matchedRule.replyText.length);
             if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-            await sock.sendPresenceUpdate("paused", from);
-            await sock.sendMessage(from, { text: matchedRule.replyText });
-            // Update counter dan lastUsedAt saat kirim pesan
+            await replySock.sendPresenceUpdate("paused", from);
+            await replySock.sendMessage(from, { text: matchedRule.replyText });
+            // Update counter dan lastUsedAt pada sesi yang MENGIRIM balasan
             await getDb().execute(
-              sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${sessionId}`
+              sql`UPDATE sessions SET messages_sent = messages_sent + 1, last_used_at = NOW() WHERE id = ${replySessionId}`
             ).catch(() => {});
+            if (replySessionId !== sessionId) {
+              logger.info({ chatJid: from, receivedBy: sessionId, repliedBy: replySessionId }, "Load balance: balasan dikirim oleh sesi berbeda");
+            }
             actionTaken = "reply";
-          } catch (err) { logger.error({ err, sessionId, messageId }, "Gagal kirim balasan"); actionTaken = "reply_failed"; }
+          } catch (err) { logger.error({ err, sessionId, replySessionId, messageId }, "Gagal kirim balasan"); actionTaken = "reply_failed"; }
         }
       } else if (matchedRule.actionType === "webhook" && matchedRule.webhookUrl) {
         const wRows = await getDb().select().from(appSettingsTable).where(eq(appSettingsTable.key, "webhookGlobalEnabled")).catch(() => []);
@@ -353,20 +457,20 @@ class WAManager {
       } else if (matchedRule.actionType === "forward" && matchedRule.forwardTo) {
         try {
           const fwdText = `[Dari: ${from}] ${text}`;
-          await sock.sendPresenceUpdate("composing", matchedRule.forwardTo);
+          await replySock.sendPresenceUpdate("composing", matchedRule.forwardTo);
           const delay = await this.getTypingDelay(fwdText.length);
           if (delay > 0) await new Promise((r) => setTimeout(r, delay));
-          await sock.sendPresenceUpdate("paused", matchedRule.forwardTo);
-          await sock.sendMessage(matchedRule.forwardTo, { text: fwdText });
-          this.touchSessionActivity(sessionId);
+          await replySock.sendPresenceUpdate("paused", matchedRule.forwardTo);
+          await replySock.sendMessage(matchedRule.forwardTo, { text: fwdText });
+          this.touchSessionActivity(replySessionId);
           actionTaken = "forward";
-        } catch (err) { logger.error({ err, sessionId }, "Forward gagal"); }
+        } catch (err) { logger.error({ err, sessionId, replySessionId }, "Forward gagal"); }
       }
     }
 
-    await this.markMessageProcessed(messageId, sessionId, actionTaken, matchedRule?.id ?? null);
+    await this.markMessageProcessed(messageId, replySessionId, actionTaken, matchedRule?.id ?? null);
 
-    eventBus.emit("message", { id: messageId, sessionId, from, pushName, text, isProcessed: true, actionTaken, repliedBySession: sessionId, repliedAt: new Date().toISOString(), timestamp: new Date().toISOString() });
+    eventBus.emit("message", { id: messageId, sessionId, from, pushName, text, isProcessed: true, actionTaken, repliedBySession: replySessionId, repliedAt: new Date().toISOString(), timestamp: new Date().toISOString() });
   }
 
   /**

@@ -10,6 +10,7 @@ import { setupRouter } from "./setup";
 import { eventsRouter } from "./events";
 import groupReplySessionsRouter from "./group-reply-sessions";
 import ruleGroupsRouter from "./rule-groups";
+import { loadBalanceRouter } from "./load-balance";
 
 const router = Router();
 
@@ -24,5 +25,6 @@ router.use("/setup", setupRouter);
 router.use("/events", eventsRouter);
 router.use("/group-reply-sessions", groupReplySessionsRouter);
 router.use("/rule-groups", ruleGroupsRouter);
+router.use("/load-balance", loadBalanceRouter);
 
 export default router;

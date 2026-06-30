@@ -140,6 +140,18 @@ CREATE INDEX IF NOT EXISTS idx_grp_reply_chat_group ON group_reply_sessions(chat
 CREATE INDEX IF NOT EXISTS idx_grp_reply_expires ON group_reply_sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_sessions_device ON sessions(current_device_id) WHERE current_device_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_sessions_last_used ON sessions(last_used_at);
+
+-- Load balance: affinitas chat → sesi
+CREATE TABLE IF NOT EXISTS chat_session_assignments (
+  chat_jid TEXT PRIMARY KEY,
+  session_id TEXT NOT NULL,
+  assigned_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  message_count INTEGER NOT NULL DEFAULT 0,
+  last_message_at TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_csa_session ON chat_session_assignments(session_id);
+CREATE INDEX IF NOT EXISTS idx_csa_last_message ON chat_session_assignments(last_message_at DESC);
 `;
 
 export async function runMigrations(): Promise<{ ok: boolean; message: string }> {
