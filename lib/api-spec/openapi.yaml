@@ -3,20 +3,27 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: WhatsApp Bot multi-session API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: sessions
+  - name: rules
+  - name: ruleGroups
+  - name: messages
+  - name: stats
+  - name: settings
+  - name: send
+  - name: groupReply
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +31,803 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /sessions:
+    get:
+      operationId: listSessions
+      tags: [sessions]
+      summary: Daftar semua sesi WA
+      responses:
+        "200":
+          description: Daftar sesi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+    post:
+      operationId: createSession
+      tags: [sessions]
+      summary: Buat sesi WA baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SessionInput"
+      responses:
+        "201":
+          description: Sesi dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /sessions/{sessionId}:
+    get:
+      operationId: getSession
+      tags: [sessions]
+      summary: Detail sesi
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Detail sesi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          description: Tidak ditemukan
+    delete:
+      operationId: deleteSession
+      tags: [sessions]
+      summary: Hapus / putuskan sesi
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Dihapus
+
+  /sessions/{sessionId}/qr:
+    get:
+      operationId: getSessionQr
+      tags: [sessions]
+      summary: Ambil QR code sesi
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Data QR code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QrCode"
+
+  /sessions/{sessionId}/reconnect:
+    post:
+      operationId: reconnectSession
+      tags: [sessions]
+      summary: Paksa reconnect sesi
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sesi direconnect
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+
+  /rules:
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: Daftar semua aturan balas otomatis
+      responses:
+        "200":
+          description: Daftar aturan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Rule"
+    post:
+      operationId: createRule
+      tags: [rules]
+      summary: Buat aturan baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleInput"
+      responses:
+        "201":
+          description: Aturan dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+
+  /rules/{ruleId}:
+    get:
+      operationId: getRule
+      tags: [rules]
+      summary: Detail aturan
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Detail aturan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+        "404":
+          description: Tidak ditemukan
+    patch:
+      operationId: updateRule
+      tags: [rules]
+      summary: Update aturan
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleUpdate"
+      responses:
+        "200":
+          description: Aturan diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rule"
+    delete:
+      operationId: deleteRule
+      tags: [rules]
+      summary: Hapus aturan
+      parameters:
+        - name: ruleId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Dihapus
+
+  /messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: Log pesan masuk
+      parameters:
+        - name: sessionId
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: dateFrom
+          in: query
+          schema:
+            type: string
+        - name: dateTo
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+        - name: offset
+          in: query
+          schema:
+            type: integer
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Daftar pesan
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+
+  /send:
+    post:
+      operationId: sendMessage
+      tags: [send]
+      summary: Kirim pesan manual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageInput"
+      responses:
+        "200":
+          description: Hasil pengiriman
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SendResult"
+
+  /send/broadcast:
+    post:
+      operationId: broadcastMessage
+      tags: [send]
+      summary: Broadcast ke banyak nomor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BroadcastInput"
+      responses:
+        "200":
+          description: Hasil broadcast
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BroadcastResult"
+
+  /stats:
+    get:
+      operationId: getStats
+      tags: [stats]
+      summary: Statistik dashboard
+      responses:
+        "200":
+          description: Statistik
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Stats"
+
+  /stats/chart:
+    get:
+      operationId: getStatsChart
+      tags: [stats]
+      summary: Data grafik 7 hari terakhir
+      responses:
+        "200":
+          description: Data grafik
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ChartDataPoint"
+
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Ambil pengaturan server
+      responses:
+        "200":
+          description: Pengaturan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerSettings"
+    put:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update pengaturan server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ServerSettings"
+      responses:
+        "200":
+          description: Pengaturan diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServerSettings"
+
+  /setup/status:
+    get:
+      operationId: getSetupStatus
+      tags: [settings]
+      summary: Status koneksi database
+      responses:
+        "200":
+          description: Status setup
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SetupStatus"
+
+  /rule-groups:
+    get:
+      operationId: listRuleGroups
+      tags: [ruleGroups]
+      summary: Daftar kelompok aturan
+      responses:
+        "200":
+          description: Daftar kelompok
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RuleGroup"
+    post:
+      operationId: createRuleGroup
+      tags: [ruleGroups]
+      summary: Buat kelompok aturan baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleGroupInput"
+      responses:
+        "201":
+          description: Kelompok dibuat
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleGroup"
+
+  /rule-groups/{id}:
+    put:
+      operationId: updateRuleGroup
+      tags: [ruleGroups]
+      summary: Update kelompok aturan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RuleGroupInput"
+      responses:
+        "200":
+          description: Kelompok diupdate
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleGroup"
+    delete:
+      operationId: deleteRuleGroup
+      tags: [ruleGroups]
+      summary: Hapus kelompok aturan
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Dihapus
+
+  /group-reply-sessions:
+    get:
+      operationId: listGroupReplySessions
+      tags: [groupReply]
+      summary: Daftar sesi kumulatif aktif
+      parameters:
+        - name: chatJid
+          in: query
+          schema:
+            type: string
+        - name: ruleGroupId
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Daftar sesi
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GroupReplySession"
+
+  /group-reply-sessions/{id}:
+    delete:
+      operationId: deleteGroupReplySession
+      tags: [groupReply]
+      summary: Hapus sesi kumulatif (reset siklus edit)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Dihapus
+
 components:
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    Session:
+      type: object
+      required: [id, name, status, messagesSent, messagesReceived, createdAt]
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        status:
+          type: string
+        phoneNumber:
+          type: ["string", "null"]
+        messagesSent:
+          type: integer
+        messagesReceived:
+          type: integer
+        createdAt:
+          type: string
+
+    SessionInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    QrCode:
+      type: object
+      required: [sessionId]
+      properties:
+        sessionId:
+          type: string
+        qr:
+          type: ["string", "null"]
+        status:
+          type: string
+
+    RuleGroup:
+      type: object
+      required: [id, name, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+
+    RuleGroupInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+
+    Rule:
+      type: object
+      required: [id, name, matchType, matchValue, actionType, isActive, priority, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        matchType:
+          type: string
+          enum: [exact, contains, regex, keyword]
+        matchValue:
+          type: string
+        actionType:
+          type: string
+          enum: [reply, webhook, forward]
+        replyText:
+          type: ["string", "null"]
+        webhookUrl:
+          type: ["string", "null"]
+        webhookMethod:
+          type: ["string", "null"]
+        forwardTo:
+          type: ["string", "null"]
+        isActive:
+          type: boolean
+        priority:
+          type: integer
+        sessionFilter:
+          type: ["string", "null"]
+        groupId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+
+    RuleInput:
+      type: object
+      required: [name, matchType, matchValue, actionType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        matchType:
+          type: string
+          enum: [exact, contains, regex, keyword]
+        matchValue:
+          type: string
+        actionType:
+          type: string
+          enum: [reply, webhook, forward]
+        replyText:
+          type: string
+        webhookUrl:
+          type: string
+        webhookMethod:
+          type: string
+        forwardTo:
+          type: string
+        isActive:
+          type: boolean
+        priority:
+          type: integer
+        sessionFilter:
+          type: string
+        groupId:
+          type: integer
+
+    RuleUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        matchType:
+          type: string
+          enum: [exact, contains, regex, keyword]
+        matchValue:
+          type: string
+        actionType:
+          type: string
+          enum: [reply, webhook, forward]
+        replyText:
+          type: string
+        webhookUrl:
+          type: string
+        webhookMethod:
+          type: string
+        forwardTo:
+          type: string
+        isActive:
+          type: boolean
+        priority:
+          type: integer
+        sessionFilter:
+          type: string
+        groupId:
+          type: integer
+
+    Message:
+      type: object
+      required: [id, sessionId, from, text, timestamp, isProcessed]
+      properties:
+        id:
+          type: integer
+        sessionId:
+          type: string
+        from:
+          type: string
+        pushName:
+          type: ["string", "null"]
+        text:
+          type: string
+        matchedRuleId:
+          type: ["integer", "null"]
+        actionTaken:
+          type: ["string", "null"]
+        repliedBySession:
+          type: ["string", "null"]
+        repliedAt:
+          type: ["string", "null"]
+        isProcessed:
+          type: boolean
+        timestamp:
+          type: string
+
+    SendMessageInput:
+      type: object
+      required: [to, text]
+      properties:
+        to:
+          type: string
+        text:
+          type: string
+        sessionId:
+          type: ["string", "null"]
+
+    SendResult:
+      type: object
+      required: [success, sessionId]
+      properties:
+        success:
+          type: boolean
+        sessionId:
+          type: string
+        messageId:
+          type: ["string", "null"]
+        error:
+          type: ["string", "null"]
+
+    BroadcastInput:
+      type: object
+      required: [recipients, text]
+      properties:
+        recipients:
+          type: array
+          items:
+            type: string
+          minItems: 1
+          maxItems: 100
+        text:
+          type: string
+        sessionId:
+          type: string
+        delayMs:
+          type: integer
+          default: 1000
+
+    BroadcastResult:
+      type: object
+      required: [total, sent, failed, results]
+      properties:
+        total:
+          type: integer
+        sent:
+          type: integer
+        failed:
+          type: integer
+        results:
+          type: array
+          items:
+            type: object
+            required: [to, success]
+            properties:
+              to:
+                type: string
+              success:
+                type: boolean
+              sessionId:
+                type: string
+              error:
+                type: string
+
+    ChartDataPoint:
+      type: object
+      required: [date, count]
+      properties:
+        date:
+          type: string
+        count:
+          type: integer
+
+    ServerSettings:
+      type: object
+      properties:
+        defaultWebhookUrl:
+          type: string
+        maxSessions:
+          type: string
+        logRetentionDays:
+          type: string
+        botGreetingMessage:
+          type: string
+        webhookGlobalEnabled:
+          type: string
+        maintenanceMode:
+          type: string
+        typingDelayMin:
+          type: string
+        typingDelayMax:
+          type: string
+
+    Stats:
+      type: object
+      required: [totalSessions, activeSessions, totalRules, activeRules, messagesToday, messagesTotal, webhooksFired, pendingMessages]
+      properties:
+        totalSessions:
+          type: integer
+        activeSessions:
+          type: integer
+        totalRules:
+          type: integer
+        activeRules:
+          type: integer
+        messagesToday:
+          type: integer
+        messagesTotal:
+          type: integer
+        webhooksFired:
+          type: integer
+        pendingMessages:
+          type: integer
+
+    SetupStatus:
+      type: object
+      required: [dbConnected, message]
+      properties:
+        dbConnected:
+          type: boolean
+        maskedUrl:
+          type: ["string", "null"]
+        message:
+          type: string
+
+    GroupReplySession:
+      type: object
+      required: [id, chatJid, ruleGroupId, botMessageId, waSessionId, replyCount, lastContent, expiresAt, createdAt]
+      properties:
+        id:
+          type: integer
+        chatJid:
+          type: string
+        ruleGroupId:
+          type: integer
+        botMessageId:
+          type: string
+        waSessionId:
+          type: string
+        replyCount:
+          type: integer
+        lastContent:
+          type: string
+        expiresAt:
+          type: string
+        createdAt:
+          type: string
